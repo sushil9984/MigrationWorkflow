@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="MigrationWorkflow.Application/MigrationWorkflow.Application.csproj" />
+  <Project Path="MigrationWorkflow.Domain/MigrationWorkflow.Domain.csproj" />
+  <Project Path="MigrationWorkflow.Infrastructure/MigrationWorkflow.Infrastructure.csproj" />
+  <Project Path="MigrationWorkflow/MigrationWorkflow.csproj" />
+</Solution>

@@ -1,0 +1,86 @@
+### Migration Workflow API Testing
+
+@MigrationWorkflow_HostAddress = https://localhost:5001
+@workflowId = {{$guid}}
+
+### 1. Start Simple Workflow (Default Settings)
+POST {{MigrationWorkflow_HostAddress}}/api/workflow/start-simple
+Content-Type: application/json
+
+###
+
+### 2. Start Custom Workflow
+POST {{MigrationWorkflow_HostAddress}}/api/workflow/start
+Content-Type: application/json
+
+{
+  "workflowId": "{{workflowId}}",
+  "migrationRequest": {
+    "collectionName": "Party",
+    "targetTableName": "Customer",
+    "batchSize": 100,
+    "fromDate": "2024-01-01T00:00:00Z",
+    "toDate": "2024-12-31T23:59:59Z"
+  },
+  "generateReconciliationReport": true,
+  "performAnalysis": true
+}
+
+###
+
+### 3. Start Workflow with Date Range
+POST {{MigrationWorkflow_HostAddress}}/api/workflow/start
+Content-Type: application/json
+
+{
+  "migrationRequest": {
+    "collectionName": "Party",
+    "targetTableName": "Customer",
+    "batchSize": 50,
+    "fromDate": "2024-01-01T00:00:00Z",
+    "toDate": "2024-06-30T23:59:59Z"
+  },
+  "generateReconciliationReport": true,
+  "performAnalysis": true
+}
+
+###
+
+### 4. Get Workflow Status
+# Replace with actual workflow ID from previous responses
+GET {{MigrationWorkflow_HostAddress}}/api/workflow/status/your-workflow-id-here
+
+###
+
+### 5. Start Migration Only (No Reconciliation)
+POST {{MigrationWorkflow_HostAddress}}/api/workflow/start
+Content-Type: application/json
+
+{
+  "migrationRequest": {
+    "collectionName": "Party",
+    "targetTableName": "Customer",
+    "batchSize": 100
+  },
+  "generateReconciliationReport": false,
+  "performAnalysis": false
+}
+
+###
+
+### 6. Start Workflow with Large Batch Size
+POST {{MigrationWorkflow_HostAddress}}/api/workflow/start
+Content-Type: application/json
+
+{
+  "migrationRequest": {
+    "collectionName": "Party",
+    "targetTableName": "Customer",
+    "batchSize": 500
+  },
+  "generateReconciliationReport": true,
+  "performAnalysis": true
+}
+
+###
+
