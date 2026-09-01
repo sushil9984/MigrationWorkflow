@@ -6,19 +6,11 @@ namespace MigrationWorkflow.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class WorkflowController : ControllerBase
+public class WorkflowController(
+    IWorkflowOrchestrator orchestrator,
+    ILogger<WorkflowController> logger)
+    : ControllerBase
 {
-    private readonly IWorkflowOrchestrator _orchestrator;
-    private readonly ILogger<WorkflowController> _logger;
-    
-    public WorkflowController(
-        IWorkflowOrchestrator orchestrator,
-        ILogger<WorkflowController> logger)
-    {
-        _orchestrator = orchestrator;
-        _logger = logger;
-    }
-    
     /// <summary>
     /// Start a new migration workflow
     /// </summary>
@@ -29,9 +21,9 @@ public class WorkflowController : ControllerBase
     {
         try
         {
-            _logger.LogInformation($"Starting workflow: {request.WorkflowId}");
+            logger.LogInformation($"Starting workflow: {request.WorkflowId}");
             
-            var result = await _orchestrator.ExecuteWorkflowAsync(request, cancellationToken);
+            var result = await orchestrator.ExecuteWorkflowAsync(request, cancellationToken);
             
             if (result.Success)
             {
@@ -42,7 +34,7 @@ public class WorkflowController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error starting workflow");
+            logger.LogError(ex, "Error starting workflow");
             return StatusCode(500, new { error = ex.Message });
         }
     }
@@ -57,12 +49,12 @@ public class WorkflowController : ControllerBase
     {
         try
         {
-            var status = await _orchestrator.GetWorkflowStatusAsync(workflowId, cancellationToken);
+            var status = await orchestrator.GetWorkflowStatusAsync(workflowId, cancellationToken);
             return Ok(status);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, $"Error getting workflow status for {workflowId}");
+            logger.LogError(ex, $"Error getting workflow status for {workflowId}");
             return StatusCode(500, new { error = ex.Message });
         }
     }
@@ -89,9 +81,9 @@ public class WorkflowController : ControllerBase
                 PerformAnalysis = true
             };
             
-            _logger.LogInformation($"Starting simple workflow: {request.WorkflowId}");
+            logger.LogInformation($"Starting simple workflow: {request.WorkflowId}");
             
-            var result = await _orchestrator.ExecuteWorkflowAsync(request, cancellationToken);
+            var result = await orchestrator.ExecuteWorkflowAsync(request, cancellationToken);
             
             if (result.Success)
             {
@@ -102,7 +94,7 @@ public class WorkflowController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error starting simple workflow");
+            logger.LogError(ex, "Error starting simple workflow");
             return StatusCode(500, new { error = ex.Message });
         }
     }

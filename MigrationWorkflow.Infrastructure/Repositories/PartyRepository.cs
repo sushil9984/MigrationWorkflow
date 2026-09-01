@@ -5,15 +5,8 @@ using MigrationWorkflow.Infrastructure.Data;
 
 namespace MigrationWorkflow.Infrastructure.Repositories;
 
-public class PartyRepository : IPartyRepository
+public class PartyRepository(MongoDbContext context) : IPartyRepository
 {
-    private readonly MongoDbContext _context;
-    
-    public PartyRepository(MongoDbContext context)
-    {
-        _context = context;
-    }
-    
     public async Task<List<Party>> GetPartiesAsync(
         int skip,
         int limit,
@@ -29,7 +22,7 @@ public class PartyRepository : IPartyRepository
         if (toDate.HasValue)
             filter &= filterBuilder.Lte(p => p.CreatedDate, toDate.Value);
         
-        return await _context.Parties
+        return await context.Parties
             .Find(filter)
             .Skip(skip)
             .Limit(limit)
@@ -49,12 +42,12 @@ public class PartyRepository : IPartyRepository
         if (toDate.HasValue)
             filter &= filterBuilder.Lte(p => p.CreatedDate, toDate.Value);
         
-        return await _context.Parties.CountDocumentsAsync(filter, cancellationToken: cancellationToken);
+        return await context.Parties.CountDocumentsAsync(filter, cancellationToken: cancellationToken);
     }
     
     public async Task<Party?> GetByIdAsync(string id, CancellationToken cancellationToken = default)
     {
-        return await _context.Parties
+        return await context.Parties
             .Find(p => p.Id == id)
             .FirstOrDefaultAsync(cancellationToken);
     }
