@@ -141,9 +141,22 @@ Edit `MigrationWorkflow/appsettings.Development.json`:
   },
   "MongoDB": {
     "DatabaseName": "migration_db"
+  },
+  "OpenAI": {
+    "ApiKey": "your-openai-api-key",
+    "Model": "gpt-4o-mini"
+  },
+  "AzureOpenAI": {
+    "Endpoint": "https://your-resource.openai.azure.com/",
+    "ApiKey": "your-azure-openai-api-key",
+    "DeploymentName": "your-chat-deployment"
   }
 }
 ```
+
+Notes:
+- LLM enhancement is optional. If both `OpenAI` and `AzureOpenAI` are empty, the workflow still runs with deterministic analysis only.
+- If both are configured, Azure OpenAI is used first.
 
 ## Step 4: Run the Application
 

@@ -9,10 +9,15 @@ namespace MigrationWorkflow.Application.Agents;
 /// </summary>
 public class AnalysisAgent : AgentBase<AnalysisRequest, AnalysisResult>, IAnalysisAgent
 {
+    private readonly IAnalysisNarrativeService _analysisNarrativeService;
+
     public override string AgentName => "AnalysisAgent";
     
-    public AnalysisAgent(ILogger<AnalysisAgent> logger) : base(logger)
+    public AnalysisAgent(
+        IAnalysisNarrativeService analysisNarrativeService,
+        ILogger<AnalysisAgent> logger) : base(logger)
     {
+        _analysisNarrativeService = analysisNarrativeService;
     }
     
     public override async Task<AnalysisResult> ExecuteAsync(
@@ -60,6 +65,8 @@ public class AnalysisAgent : AgentBase<AnalysisRequest, AnalysisResult>, IAnalys
             {
                 GenerateDetailedAnalysis(result, report);
             }
+
+            await EnrichWithLlmNarrativeAsync(input, result, cancellationToken);
             
             LogInfo($"Analysis completed. Status: {result.OverallStatus}, Quality Score: {result.QualityScore:F2}%");
         }
@@ -190,5 +197,62 @@ public class AnalysisAgent : AgentBase<AnalysisRequest, AnalysisResult>, IAnalys
         }
         
         result.DetailedAnalysis = analysis.ToString();
+    }
+
+    private async Task EnrichWithLlmNarrativeAsync(
+        AnalysisRequest input,
+        AnalysisResult result,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var narrative = await _analysisNarrativeService.GenerateNarrativeAsync(input, result, cancellationToken);
+            if (narrative == null)
+            {
+                return;
+            }
+
+            result.ExecutiveSummary = narrative.ExecutiveSummary;
+
+            if (!string.IsNullOrWhiteSpace(narrative.DetailedAnalysis))
+            {
+                result.DetailedAnalysis = narrative.DetailedAnalysis;
+            }
+
+            result.KeyFindings = MergeUnique(result.KeyFindings, narrative.KeyFindings);
+            result.Recommendations = MergeUnique(result.Recommendations, narrative.Recommendations);
+            result.CriticalIssues = MergeUnique(result.CriticalIssues, narrative.CriticalIssues);
+            result.LlmEnhanced = true;
+            result.LlmProvider = narrative.Provider;
+            result.LlmModel = narrative.Model;
+
+            LogInfo($"LLM narrative added using {narrative.Provider}/{narrative.Model}");
+        }
+        catch (Exception ex)
+        {
+            LogWarning($"LLM narrative enhancement skipped: {ex.Message}");
+        }
+    }
+
+    private static List<string> MergeUnique(IEnumerable<string> current, IEnumerable<string> incoming)
+    {
+        var merged = new List<string>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var item in current.Concat(incoming))
+        {
+            if (string.IsNullOrWhiteSpace(item))
+            {
+                continue;
+            }
+
+            var trimmed = item.Trim();
+            if (seen.Add(trimmed))
+            {
+                merged.Add(trimmed);
+            }
+        }
+
+        return merged;
     }
 }

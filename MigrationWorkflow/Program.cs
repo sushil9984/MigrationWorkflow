@@ -4,6 +4,7 @@ using MigrationWorkflow.Application.Workflow;
 using MigrationWorkflow.Domain.Interfaces;
 using MigrationWorkflow.Infrastructure.Data;
 using MigrationWorkflow.Infrastructure.Repositories;
+using MigrationWorkflow.Infrastructure.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -35,6 +36,7 @@ builder.Services.AddScoped<ICustomerRepository, CustomerRepository>();
 // Register Agents
 builder.Services.AddScoped<IMigrationAgent, MigrationAgent>();
 builder.Services.AddScoped<IReconciliationAgent, ReconciliationAgent>();
+builder.Services.AddScoped<IAnalysisNarrativeService, SemanticKernelAnalysisNarrativeService>();
 builder.Services.AddScoped<IAnalysisAgent, AnalysisAgent>();
 
 // Register Workflow Orchestrator
