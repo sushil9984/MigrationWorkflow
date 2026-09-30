@@ -13,4 +13,9 @@ public interface ICustomerRepository
     Task AddAsync(Customer customer, CancellationToken cancellationToken = default);
     Task UpdateAsync(Customer customer, CancellationToken cancellationToken = default);
     Task SaveChangesAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Discards all pending (unsaved) changes so a failed batch cannot poison later saves.
+    /// </summary>
+    void ClearPendingChanges();
 }

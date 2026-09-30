@@ -9,4 +9,8 @@ public class ReconciliationRequest
     public MigrationResult MigrationResult { get; set; } = new();
     public string SourceCollectionName { get; set; } = string.Empty;
     public string TargetTableName { get; set; } = string.Empty;
+
+    // Same CreatedDate range the migration used, so only the migrated slice is reconciled
+    public DateTime? FromDate { get; set; }
+    public DateTime? ToDate { get; set; }
 }

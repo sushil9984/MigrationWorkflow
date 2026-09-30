@@ -61,6 +61,9 @@ public class WorkflowOrchestrator : IWorkflowOrchestrator
                 result.FailedAtStage = "Migration";
                 result.Errors.AddRange(result.MigrationResult.Errors);
                 result.CurrentStage = WorkflowStage.Failed;
+                stopwatch.Stop();
+                result.CompletedAt = DateTime.UtcNow;
+                result.TotalDuration = stopwatch.Elapsed;
                 UpdateWorkflowStatus(request.WorkflowId, WorkflowStage.Failed, 100, "Migration failed", true);
                 return result;
             }
@@ -80,13 +83,28 @@ public class WorkflowOrchestrator : IWorkflowOrchestrator
                     MigrationId = result.MigrationResult.MigrationId,
                     MigrationResult = result.MigrationResult,
                     SourceCollectionName = request.MigrationRequest.CollectionName,
-                    TargetTableName = request.MigrationRequest.TargetTableName
+                    TargetTableName = request.MigrationRequest.TargetTableName,
+                    FromDate = request.MigrationRequest.FromDate,
+                    ToDate = request.MigrationRequest.ToDate
                 };
-                
+
                 result.ReconciliationReport = await _reconciliationAgent.ExecuteAsync(
                     reconciliationRequest,
                     cancellationToken);
-                
+
+                if (!result.ReconciliationReport.Succeeded)
+                {
+                    result.Success = false;
+                    result.FailedAtStage = WorkflowStage.Reconciliation.ToString();
+                    result.Errors.Add(result.ReconciliationReport.Summary);
+                    result.CurrentStage = WorkflowStage.Failed;
+                    stopwatch.Stop();
+                    result.CompletedAt = DateTime.UtcNow;
+                    result.TotalDuration = stopwatch.Elapsed;
+                    UpdateWorkflowStatus(request.WorkflowId, WorkflowStage.Failed, 100, "Reconciliation failed", true);
+                    return result;
+                }
+
                 result.CompletedStage = WorkflowStage.Reconciliation;
                 UpdateWorkflowStatus(request.WorkflowId, WorkflowStage.Reconciliation, 70, "Reconciliation completed");
             }
@@ -130,8 +148,8 @@ public class WorkflowOrchestrator : IWorkflowOrchestrator
             result.Success = false;
             result.CompletedAt = DateTime.UtcNow;
             result.TotalDuration = stopwatch.Elapsed;
+            result.FailedAtStage = result.CurrentStage.ToString(); // capture before overwriting with Failed
             result.CurrentStage = WorkflowStage.Failed;
-            result.FailedAtStage = result.CurrentStage.ToString();
             result.Errors.Add($"Workflow failed: {ex.Message}");
             
             UpdateWorkflowStatus(request.WorkflowId, WorkflowStage.Failed, 100, $"Workflow failed: {ex.Message}", true);

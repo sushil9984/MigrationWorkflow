@@ -9,6 +9,8 @@ namespace MigrationWorkflow.Application.Agents;
 /// </summary>
 public class AnalysisAgent : AgentBase<AnalysisRequest, AnalysisResult>, IAnalysisAgent
 {
+    private const double CriticalCountDiffRatio = 0.05;
+
     private readonly IAnalysisNarrativeService _analysisNarrativeService;
 
     public override string AgentName => "AnalysisAgent";
@@ -39,12 +41,7 @@ public class AnalysisAgent : AgentBase<AnalysisRequest, AnalysisResult>, IAnalys
             result.QualityScore = report.DataAccuracyPercentage;
             
             // Determine overall status
-            result.OverallStatus = result.QualityScore switch
-            {
-                >= 99.0 => "Success",
-                >= 95.0 => "Warning",
-                _ => "Failed"
-            };
+            result.OverallStatus = DetermineOverallStatus(report, result.QualityScore);
             
             // Analyze discrepancy types
             result.DiscrepancyTypeBreakdown = report.Discrepancies
@@ -73,15 +70,41 @@ public class AnalysisAgent : AgentBase<AnalysisRequest, AnalysisResult>, IAnalys
         catch (Exception ex)
         {
             LogError("Analysis failed", ex);
+            result.OverallStatus = "Failed";
             result.CriticalIssues.Add($"Analysis failed: {ex.Message}");
         }
-        
-        return await Task.FromResult(result);
+
+        return result;
     }
-    
+
+    private static string DetermineOverallStatus(ReconciliationReport report, double qualityScore)
+    {
+        // Reconciliation itself failing means nothing else in the report can be trusted
+        if (!report.Succeeded)
+            return "Failed";
+
+        var status = qualityScore switch
+        {
+            >= 99.0 => "Success",
+            >= 95.0 => "Warning",
+            _ => "Failed"
+        };
+
+        // Accuracy alone can look perfect while records are absent or unexpected, so the
+        // reconciliation verdict and count difference also cap the status.
+        var countDiff = Math.Abs(report.SourceRecordCount - report.TargetRecordCount);
+        if (report.SourceRecordCount > 0 && countDiff > report.SourceRecordCount * CriticalCountDiffRatio)
+            return "Failed";
+
+        if (!report.IsReconciled && status == "Success")
+            return "Warning";
+
+        return status;
+    }
+
     private void GenerateKeyFindings(AnalysisResult result, ReconciliationReport report)
     {
-        result.KeyFindings.Add($"Total records processed: {report.TargetRecordCount}");
+        result.KeyFindings.Add($"Records in source: {report.SourceRecordCount}, in target: {report.TargetRecordCount}");
         result.KeyFindings.Add($"Data accuracy: {report.DataAccuracyPercentage:F2}%");
         result.KeyFindings.Add($"Migration is {(report.IsReconciled ? "fully" : "not fully")} reconciled");
         
@@ -93,7 +116,8 @@ public class AnalysisAgent : AgentBase<AnalysisRequest, AnalysisResult>, IAnalys
         
         if (report.Discrepancies.Any())
         {
-            result.KeyFindings.Add($"Found {report.Discrepancies.Count} data discrepancies requiring attention");
+            result.KeyFindings.Add(
+                $"Found {report.Discrepancies.Count} data discrepancies across {report.AffectedRecordCount} records requiring attention");
         }
     }
     
@@ -109,19 +133,25 @@ public class AnalysisAgent : AgentBase<AnalysisRequest, AnalysisResult>, IAnalys
             result.Recommendations.Add("Investigate missing or extra records in target database");
         }
         
-        var missingRecords = report.Discrepancies.Count(d => d.DiscrepancyType == "Missing");
+        var missingRecords = DistinctRecordCount(report, DiscrepancyTypes.Missing);
         if (missingRecords > 0)
         {
             result.Recommendations.Add($"Re-run migration for {missingRecords} missing records");
         }
-        
-        var mismatchRecords = report.Discrepancies.Count(d => d.DiscrepancyType == "Mismatch");
+
+        var mismatchRecords = DistinctRecordCount(report, DiscrepancyTypes.Mismatch);
         if (mismatchRecords > 0)
         {
             result.Recommendations.Add($"Validate transformation logic for {mismatchRecords} mismatched records");
         }
-        
-        if (report.IsReconciled)
+
+        var extraRecords = DistinctRecordCount(report, DiscrepancyTypes.Extra);
+        if (extraRecords > 0)
+        {
+            result.Recommendations.Add($"Review {extraRecords} target records that no longer have a source record");
+        }
+
+        if (report.IsReconciled && result.OverallStatus == "Success")
         {
             result.Recommendations.Add("Migration completed successfully. Safe to proceed with next steps");
         }
@@ -135,16 +165,30 @@ public class AnalysisAgent : AgentBase<AnalysisRequest, AnalysisResult>, IAnalys
         }
         
         var countDiff = Math.Abs(report.SourceRecordCount - report.TargetRecordCount);
-        if (countDiff > report.SourceRecordCount * 0.05) // More than 5% difference
+        if (countDiff > report.SourceRecordCount * CriticalCountDiffRatio)
         {
             result.CriticalIssues.Add($"CRITICAL: Significant record count mismatch ({countDiff} records)");
         }
-        
-        var missingCount = report.Discrepancies.Count(d => d.DiscrepancyType == "Missing");
+
+        var missingCount = DistinctRecordCount(report, DiscrepancyTypes.Missing);
         if (missingCount > 10)
         {
             result.CriticalIssues.Add($"CRITICAL: High number of missing records ({missingCount})");
         }
+
+        if (!report.Succeeded)
+        {
+            result.CriticalIssues.Add($"CRITICAL: Reconciliation failed: {report.ErrorMessage}");
+        }
+    }
+
+    private static int DistinctRecordCount(ReconciliationReport report, string discrepancyType)
+    {
+        return report.Discrepancies
+            .Where(d => d.DiscrepancyType == discrepancyType)
+            .Select(d => d.RecordId)
+            .Distinct()
+            .Count();
     }
     
     private void GenerateDetailedAnalysis(AnalysisResult result, ReconciliationReport report)

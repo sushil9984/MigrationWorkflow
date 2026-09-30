@@ -104,7 +104,20 @@ public class SemanticKernelAnalysisNarrativeService : IAnalysisNarrativeService
 
         try
         {
-            var response = await _kernel.InvokePromptAsync(prompt, cancellationToken: cancellationToken);
+            var executionSettings = new OpenAIPromptExecutionSettings
+            {
+                ResponseFormat = "json_object",
+                Temperature = 0,
+                MaxTokens = 1500
+            };
+
+            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeoutCts.CancelAfter(TimeSpan.FromSeconds(60));
+
+            var response = await _kernel.InvokePromptAsync(
+                prompt,
+                new KernelArguments(executionSettings),
+                cancellationToken: timeoutCts.Token);
             rawResponse = response.ToString();
             cleanedJson = CleanupJson(rawResponse);
 
@@ -162,11 +175,13 @@ public class SemanticKernelAnalysisNarrativeService : IAnalysisNarrativeService
             .Take(25)
             .Select(d => new
             {
+                // Actual values (emails, phones, names) are customer PII and are deliberately
+                // not sent to the external model; only the shape of the discrepancy is.
                 d.RecordId,
                 d.FieldName,
-                d.SourceValue,
-                d.TargetValue,
-                d.DiscrepancyType
+                d.DiscrepancyType,
+                SourceValuePresent = !string.IsNullOrEmpty(d.SourceValue),
+                TargetValuePresent = !string.IsNullOrEmpty(d.TargetValue)
             })
             .ToList();
 

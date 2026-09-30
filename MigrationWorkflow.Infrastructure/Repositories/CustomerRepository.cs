@@ -37,4 +37,9 @@ public class CustomerRepository(PostgresDbContext context) : ICustomerRepository
     {
         await context.SaveChangesAsync(cancellationToken);
     }
+
+    public void ClearPendingChanges()
+    {
+        context.ChangeTracker.Clear();
+    }
 }

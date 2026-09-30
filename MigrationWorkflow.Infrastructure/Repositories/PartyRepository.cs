@@ -24,6 +24,7 @@ public class PartyRepository(MongoDbContext context) : IPartyRepository
         
         return await context.Parties
             .Find(filter)
+            .SortBy(p => p.Id) // stable order so skip/limit paging never skips or repeats records
             .Skip(skip)
             .Limit(limit)
             .ToListAsync(cancellationToken);

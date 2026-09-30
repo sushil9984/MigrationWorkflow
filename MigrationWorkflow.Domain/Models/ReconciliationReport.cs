@@ -12,8 +12,9 @@ public class ReconciliationReport
     // Count comparisons
     public int SourceRecordCount { get; set; }
     public int TargetRecordCount { get; set; }
-    public int MismatchCount { get; set; }
-    
+    public int MismatchCount { get; set; } // number of discrepancy rows (a record can have several)
+    public int AffectedRecordCount { get; set; } // distinct records with at least one discrepancy
+
     // Data quality metrics
     public double DataAccuracyPercentage { get; set; }
     public List<ReconciliationDiscrepancy> Discrepancies { get; set; } = new();
@@ -21,6 +22,17 @@ public class ReconciliationReport
     // Summary
     public bool IsReconciled { get; set; }
     public string Summary { get; set; } = string.Empty;
+
+    // Set when reconciliation itself failed; the counts above are then not trustworthy
+    public string? ErrorMessage { get; set; }
+    public bool Succeeded => ErrorMessage == null;
+}
+
+public static class DiscrepancyTypes
+{
+    public const string Missing = "Missing";   // in source, not in target
+    public const string Mismatch = "Mismatch"; // in both, field values differ
+    public const string Extra = "Extra";       // in target, not in source
 }
 
 public class ReconciliationDiscrepancy
